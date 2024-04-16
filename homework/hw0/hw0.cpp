@@ -133,7 +133,7 @@ int main() {
 	robot->setQ(robot_q);
 	robot->updateKinematics();
 	ee_jacobian = robot->Jv(ee_link_name, ee_pos_in_link);
-	cout << "========================================= Q2-d-ii" << endl << endl;
+	cout << "========================================= Q2-d-i" << endl << endl;
 	cout << "Jv for configuration d-i\n" << ee_jacobian << endl << endl;
 	// part ii
 	robot_q << M_PI/2, 0.5, -M_PI/2; // modify this

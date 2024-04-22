@@ -6,6 +6,16 @@
 #include <string>
 #include <thread>
 
+// String formatting
+#include <fstream>
+#include <sstream>
+#include <string>
+
+// Customzied timmer
+#include <iostream>
+#include <chrono>
+#include <thread>
+
 // sai2 main libraries includes
 #include "Sai2Model.h"
 
@@ -98,7 +108,33 @@ int main(int argc, char** argv) {
     const double control_freq = 1000;
     Sai2Common::LoopTimer timer(control_freq);
 
+    // Stream data to file
+    std::ostringstream stream;
+    stream << "../../homework/hw1/data_files/que_" << controller_number << ".txt";
+    std::string file_name = stream.str();
+
+    ofstream file_output;
+    file_output.open(file_name);
+    if (!file_output.is_open()) {cout << "Failed to open file: " << file_name << endl; exit(0);}
+	else {cout << "File opened successfully" << endl;}
+
+    // Start time point
+    auto start = std::chrono::high_resolution_clock::now();
+    // Set the desired loop duration as 1.2 seconds
+    std::chrono::duration<double> timeout(1.2);
+
+
     while (runloop) {
+        // Current time point
+        auto now = std::chrono::high_resolution_clock::now();
+
+        // Check the elapsed time
+        if (now - start >= timeout) {
+            std::cout << "1.2 seconds have passed. Exiting loop." << std::endl;
+            break;
+        }
+
+
         // wait for next scheduled loop
         timer.waitForNextLoop();
         double time = timer.elapsedTime();
@@ -116,30 +152,67 @@ int main(int argc, char** argv) {
         // ---------------------------  question 1 ---------------------------------------
         if(controller_number == 1) {
 
-            double kp = 0.0;      // chose your p gain
-            double kv = 0.0;      // chose your d gain
+            control_torques.setZero();
+            file_output << time << "\t" << robot->q().transpose() << "\n";
+
+            double kp = 400.0;      // chose your p gain
+            double kv = 47.0;      // chose your d gain
 
             VectorXd q_desired = initial_q;   // change to the desired robot joint angles for the question
+            q_desired << M_PI/2, - M_PI/4, 0, - M_PI * 125/180, 0, M_PI * 80/180, 0; // modify this
 
-            control_torques.setZero();  // change to the control torques you compute
+            control_torques << -kp * (robot->q() - q_desired) - kv * robot->dq();
+
+            // cout << "debug print" << endl;
+            // cout << "Init q: " << initial_q(0) << initial_q(1) << initial_q(3) << endl;
+            // cout << "Current q: "<< robot->q()(0) << robot->q()(1) << robot->q()(3) << endl;
         }
 
         // ---------------------------  question 2 ---------------------------------------
         else if(controller_number == 2) {
 
             control_torques.setZero();
+            file_output << time << "\t" << robot->q().transpose() << "\n";
+
+            double kp = 400.0;      // chose your p gain
+            double kv = 49.0;      // chose your d gain
+
+            VectorXd q_desired = initial_q;   // change to the desired robot joint angles for the question
+            q_desired << M_PI/2, - M_PI/4, 0, - M_PI * 125/180, 0, M_PI * 80/180, 0; // modify this
+
+            control_torques << -kp * (robot->q() - q_desired) - kv * robot->dq() + robot->jointGravityVector();
+            
         }
 
         // ---------------------------  question 3 ---------------------------------------
         else if(controller_number == 3) {
 
             control_torques.setZero();
+            file_output << time << "\t" << robot->q().transpose() << "\n";
+
+            double kp = 400.0;      // chose your p gain
+            double kv = 43.0;      // chose your d gain
+
+            VectorXd q_desired = initial_q;   // change to the desired robot joint angles for the question
+            q_desired << M_PI/2, - M_PI/4, 0, - M_PI * 125/180, 0, M_PI * 80/180, 0; // modify this
+
+            control_torques << robot->M() * (-kp * (robot->q() - q_desired) - kv * robot->dq()) + robot->jointGravityVector();
         }
 
         // ---------------------------  question 4 ---------------------------------------
         else if(controller_number == 4) {
 
             control_torques.setZero();
+            file_output << time << "\t" << robot->q().transpose() << "\n";
+
+            double kp = 400.0;      // chose your p gain
+            // double kv = 40.0;      // chose your d gain
+            double kv = 45.0;      // chose your d gain
+
+            VectorXd q_desired = initial_q;   // change to the desired robot joint angles for the question
+            q_desired << M_PI/2, - M_PI/4, 0, - M_PI * 125/180, 0, M_PI * 80/180, 0; // modify this
+
+            control_torques << robot->M() * (-kp * (robot->q() - q_desired) - kv * robot->dq()) + robot->coriolisForce() + robot->jointGravityVector();
         }
 
         // ---------------------------  question 5 ---------------------------------------
@@ -156,6 +229,8 @@ int main(int argc, char** argv) {
         redis_client.setInt("sai2::interfaces::simviz::gravity_comp_enabled", 0);
         redis_client.sendAllFromGroup();
     }
+
+    file_output.close();
 
     control_torques.setZero();
     redis_client.sendAllFromGroup();

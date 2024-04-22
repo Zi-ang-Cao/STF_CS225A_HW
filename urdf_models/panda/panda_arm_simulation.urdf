@@ -123,7 +123,9 @@
     <link name="link7">
       <inertial>
         <origin xyz="0 0 0.17" rpy="0 -0 0" />
-        <mass value="0.5" />
+        <!-- Change mass of link7 from 0.5kg to 3.0 kg to simulate the 2.5 kg additional payload -->
+        <!-- <mass value="0.5" /> -->
+        <mass value="3.0" />
         <inertia ixx="0.09" iyy="0.05" izz="0.07" ixy="0" ixz="0" iyz="0" />
       </inertial>
       <visual>

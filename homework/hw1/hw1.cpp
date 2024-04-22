@@ -219,6 +219,15 @@ int main(int argc, char** argv) {
         else if(controller_number == 5) {
 
             control_torques.setZero();
+            file_output << time << "\t" << robot->q().transpose() << "\n";
+
+            double kp = 400.0;      // chose your p gain
+            double kv = 40.0;      // chose your d gain
+
+            VectorXd q_desired = initial_q;   // change to the desired robot joint angles for the question
+            q_desired << M_PI/2, - M_PI/4, 0, - M_PI * 125/180, 0, M_PI * 80/180, 0; // modify this
+
+            control_torques << robot->M() * (-kp * (robot->q() - q_desired) - kv * robot->dq()) + robot->coriolisForce() + robot->jointGravityVector();
         }
 
         // **********************

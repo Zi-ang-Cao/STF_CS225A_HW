@@ -6,6 +6,20 @@
 #include <string>
 #include <thread>
 
+// **********************
+// WRITE YOUR CODE HERE
+// String formatting
+#include <fstream>
+#include <sstream>
+#include <string>
+
+// Customzied timmer
+#include <iostream>
+#include <chrono>
+#include <thread>
+// **********************
+
+
 // sai2 main libraries includes
 #include "Sai2Model.h"
 
@@ -115,7 +129,36 @@ int main(int argc, char** argv) {
     const double control_freq = 1000;
     Sai2Common::LoopTimer timer(control_freq);
 
+    // **********************
+    // WRITE YOUR CODE HERE
+    // Stream data to file
+    std::ostringstream stream;
+    stream << "../../homework/hw2/data_files/que_" << controller_number << ".txt";
+    std::string file_name = stream.str();
+    ofstream file_output;
+    file_output.open(file_name);
+    if (!file_output.is_open()) {cout << "Failed to open file: " << file_name << endl; exit(0);}
+	else {cout << "File opened successfully" << endl;}
+
+    // Start time point
+    auto start = std::chrono::high_resolution_clock::now();
+    // Set the desired loop duration as 3.0 seconds
+    std::chrono::duration<double> timeout(5.0);
+    // **********************
+
     while (runloop) {
+
+        // **********************
+        // Current time point
+        auto now = std::chrono::high_resolution_clock::now();
+        // Check the elapsed time
+        if (now - start >= timeout) {
+            std::cout << "5.0 seconds have passed. Exiting loop." << std::endl;
+            break;
+        }
+        // **********************
+
+
         // wait for next scheduled loop
         timer.waitForNextLoop();
         double time = timer.elapsedTime();
@@ -134,6 +177,48 @@ int main(int argc, char** argv) {
         if(controller_number == 1) {
 
             control_torques.setZero();
+
+            file_output << time << "\t" << robot->q().transpose() << "\n";
+
+            // For joint 1 to 6, use the following values:
+            double kp = 400.0;
+            double kv = 50.0;
+            // For joint 7, use the following values:
+            double kp7 = 50.0;
+            // double kv7 = -0.250;  // modify this
+            // double kv7 = -0.01;  // modify this
+            // double kv7 = -0.05;  // modify this
+            // double kv7 = -0.08;  // modify this
+
+
+
+            double kv7 = -0.34;  // modify this --> 0.35 is the best value
+
+            // Set q7d=0.1 rad
+            double q7d = 0.1;  // modify this
+            double m77 = 0.25;
+
+            VectorXd q_desired = initial_q;   // change to the desired robot joint angles for the question
+            // Only change the joint 7 to 0.1 rad!!!
+            q_desired(6) = 0.1;  // modify this
+
+            control_torques.setZero();
+            // Use kp and kv for joint 1 to 6, kp7 and kv7 for joint 7, and m77 for the mass of the end-effector
+            for (int i = 0; i < 6; i++) {
+                control_torques(i) = -kp * (robot->q()(i) - q_desired(i)) - kv * robot->dq()(i) + 
+                                    // robot->coriolisForce()(i) + robot->jointGravityVector()(i);
+                                    robot->jointGravityVector()(i);
+
+            }
+            control_torques(6) = -kp7 * (robot->q()(6) - q7d) - kv7 * robot->dq()(6) + 
+                                // robot->coriolisForce()(6) + robot->jointGravityVector()(6);
+                                robot->jointGravityVector()(6);
+
+
+
+            // control_torques(0:5) << (-kp * (robot->q()(0:5) - q_desired(0:5)) - kv * robot->dq()(0:5)) + robot->coriolisForce()(0:5) + robot->jointGravityVector()(0:5);
+            // control_torques(6) = (-kp7 * (robot->q()(6) - q7d) - kv7 * robot->dq()(6)) + robot->coriolisForce()(6) + robot->jointGravityVector()(6);   
+            // // control_torques.setZero();
         }
 
         // ---------------------------  question 2 ---------------------------------------

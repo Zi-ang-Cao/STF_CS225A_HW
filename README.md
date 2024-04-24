@@ -35,3 +35,14 @@ When you run hw0 and modify the values for the joints, it will modify the positi
 ```Shell
 redis_client.setEigen(JOINT_ANGLES_KEY, robot->q());
 ```
+
+### hw1
+You have 2 programs there. A visualizer and the actual homework file.
+```Shell
+# First
+sai_hw1_vis
+
+# Second
+sai_hw1 1   # sai_hw1 x, where x is the question id
+```
+

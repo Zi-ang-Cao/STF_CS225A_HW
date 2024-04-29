@@ -16,6 +16,19 @@
 // redis keys
 #include "redis_keys.h"
 
+// **********************
+// WRITE YOUR CODE HERE
+// String formatting
+#include <fstream>
+#include <sstream>
+#include <string>
+
+// Customzied timmer
+#include <iostream>
+#include <chrono>
+#include <thread>
+// **********************
+
 // for handling ctrl+c and interruptions properly
 #include <signal.h>
 bool runloop = true;
@@ -115,7 +128,42 @@ int main(int argc, char** argv) {
     const double control_freq = 1000;
     Sai2Common::LoopTimer timer(control_freq);
 
+    // **********************
+    // WRITE YOUR CODE HERE
+    // Stream data to file
+    std::ostringstream stream;
+    stream << "../../homework/hw3/data_files/que_" << controller_number << ".txt";
+    std::string file_name = stream.str();
+    ofstream file_output;
+    file_output.open(file_name);
+    if (!file_output.is_open()) {cout << "Failed to open file: " << file_name << endl; exit(0);}
+	else {cout << "File opened successfully" << endl;}
+
+    // Start time point
+    double duration = 10.0;
+    if(controller_number == 1) {duration = 10.0;}
+    else if(controller_number == 2) {duration = 1.5;}
+    else if(controller_number == 3) {duration = 3.0;}
+    else if(controller_number >= 4) {duration = 10.0;}
+
+    auto start = std::chrono::high_resolution_clock::now();
+    // Set the desired loop duration as 3.0 seconds
+    std::chrono::duration<double> timeout(duration);
+    // **********************
+
     while (runloop) {
+
+        // **********************
+        // Current time point
+        auto now = std::chrono::high_resolution_clock::now();
+        // Check the elapsed time
+        if (now - start >= timeout) {
+            std::cout << duration << " seconds have passed. Exiting loop." << std::endl;
+            break;
+        }
+        // **********************
+
+
         // wait for next scheduled loop
         timer.waitForNextLoop();
         double time = timer.elapsedTime();
@@ -133,7 +181,46 @@ int main(int argc, char** argv) {
         // ---------------------------  question 1 ---------------------------------------
         if(controller_number == 1) {
 
+
+            // operational space control
+            VectorXd x = robot->position(link_name, pos_in_link);
+            VectorXd x_desired = x;
+            x_desired << 0.3 + 0.1 * (sin(M_PI * time)), 0.1 + 0.1 * (cos(M_PI * time)), 0.5;
+            VectorXd dx = robot->linearVelocity(link_name, pos_in_link);
+            // joint space control
+            VectorXd q_desired = initial_q;
+            q_desired << 0, 0, 0, 0, 0, 0, 0;
+
+            // Logging data
+            file_output << time << "\t" << x.transpose() << "\t" << robot->q().transpose() << "\n";
+
+            double kp = 100.0;
+            double kv = 20.0;
+            double kpj = 50.0;
+            double kvj = 14.0;
+
+            Jv = robot->Jv(link_name, pos_in_link);
+            Lambda = robot->taskInertiaMatrix(Jv);
+            J_bar = robot->dynConsistentInverseJacobian(Jv);
+            N = robot->nullspaceMatrix(Jv);
+            VectorXd g = robot->jointGravityVector();
+
+            // // ------ (1a) PD ------
+            // VectorXd F = Lambda * (-kp * (x - x_desired) - kv * dx);
+
+            // ------ (1c) PD + desired 1st and 2nd direvative in joint space  ------
+            VectorXd x_desired_dot = VectorXd::Zero(3);
+            double scale = M_PI * 0.1;
+            x_desired_dot << scale * cos(M_PI * time), -scale * sin(M_PI * time), 0;
+            VectorXd x_desired_ddot = VectorXd::Zero(3);
+            scale = M_PI * M_PI * 0.1;
+            x_desired_ddot << -scale * sin(M_PI * time), -scale * cos(M_PI * time), 0;
+
+            VectorXd F = Lambda * (x_desired_ddot -kp * (x - x_desired) - kv * (dx - x_desired_dot));
+
+            // ------ IN COMMON control_torques ------
             control_torques.setZero();
+            control_torques = Jv.transpose() * F + N.transpose() * (- kpj * (robot_q - q_desired) - kvj * robot_dq) + g;  
         }
 
         // ---------------------------  question 2 ---------------------------------------
@@ -162,6 +249,10 @@ int main(int argc, char** argv) {
         // send to redis
         redis_client.sendAllFromGroup();
     }
+
+    // **********************
+    file_output.close();
+    // **********************
 
     control_torques.setZero();
     gravity_comp_enabled = true;

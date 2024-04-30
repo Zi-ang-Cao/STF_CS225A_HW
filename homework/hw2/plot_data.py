@@ -86,7 +86,7 @@ os.chdir('/Users/zi-angcao/03_ResearchRepo/SAI2/OpenSai/STF_CS225A_HW/homework/h
 
 # for question_idx in [1, 2, 3, 4, 5]:
 # for question_idx in [2]:
-for question_idx in [3, 4]:
+for question_idx in [4]:
     file_path=f'./data_files/que_{question_idx}.txt'
     output_file_path=f'./img_out/que_{question_idx}.png'
     X_values, Y_values_list, subTitle_values, title_values = read_data(file_path, question_idx)

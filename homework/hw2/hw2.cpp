@@ -355,9 +355,14 @@ int main(int argc, char** argv) {
             double kp_q = 300.0;
             double kv_q = 30.0;
             VectorXd joint_space_control = -kp_q * (robot->q() - q_desired) - kv_q * robot->dq();
-            // ------ (4d) PD controler toward qd = zeros((7, )) ----------------
-            joint_space_control += robot->jointGravityVector();
+            joint_space_control = N.transpose() * M * joint_space_control;
             
+            // ------ (4d) Consider joint space gravity vector as well ----------------
+            // joint_space_control += robot->jointGravityVector();
+            joint_space_control += N.transpose() * M * (robot->jointGravityVector());
+            
+
+            // ------ IN COMMON control_torques ------
             control_torques.setZero();
             control_torques = task_space_control + joint_space_control;
         }

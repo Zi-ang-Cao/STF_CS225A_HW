@@ -142,7 +142,7 @@ int main(int argc, char** argv) {
     // Start time point
     double duration = 10.0;
     if(controller_number == 1) {duration = 10.0;}
-    else if(controller_number == 2) {duration = 1.5;}
+    else if(controller_number == 2) {duration = 1.8;}
     else if(controller_number == 3) {duration = 3.0;}
     else if(controller_number >= 4) {duration = 10.0;}
 
@@ -192,7 +192,7 @@ int main(int argc, char** argv) {
             q_desired << 0, 0, 0, 0, 0, 0, 0;
 
             // Logging data
-            file_output << time << "\t" << x.transpose() << "\t" << robot->q().transpose() << "\n";
+            file_output << time << "\t" << x.transpose() << "\t" << x_desired.transpose() << "\t" << robot->q().transpose() << "\n";
 
             double kp = 100.0;
             double kv = 20.0;
@@ -226,7 +226,61 @@ int main(int argc, char** argv) {
         // ---------------------------  question 2 ---------------------------------------
         else if(controller_number == 2) {
 
+            int for_Que_de = 0; // 0 for Que f, g
+
             control_torques.setZero();
+
+            double kp = 100.0;
+            double kv = 20.0;
+            double kpj = 50.0;
+            double kvj = 14.0;
+            
+            // joint space control
+            double k_mid = 25.0;
+            double k_damp = 14.0;
+
+            VectorXd q_low = initial_q;
+            VectorXd q_high = initial_q;
+            q_low << -165, -100, -165, -170, -165, 0, -165;
+            q_high << 165, 100, 165, -30, 165, 210, 165;
+            q_low = q_low * M_PI/180;   // change [degree] to [radians]
+            q_high = q_high * M_PI/180; // change [degree] to [radians]
+
+            VectorXd tao_mid = VectorXd::Zero(dof);
+            VectorXd tao_damp = VectorXd::Zero(dof);
+            tao_mid = k_mid * ((q_low + q_high) - 2 * robot_q);
+            tao_damp = - k_damp * robot_dq;
+
+            // operational space control
+            VectorXd x = robot->position(link_name, pos_in_link);
+            VectorXd x_desired = x;
+            if (for_Que_de == 1) {x_desired << -0.1, 0.15, 0.2;}
+            else {x_desired << -0.65, -0.45, 0.7;}
+            VectorXd dx = robot->linearVelocity(link_name, pos_in_link);
+
+            // ----- Save into the file -----
+            file_output << time << "\t" << x.transpose() << "\t" << x_desired.transpose() << "\t" << robot->q().transpose() << "\n";
+
+            // ----- In Common -----
+            control_torques.setZero();
+            Jv = robot->Jv(link_name, pos_in_link);
+            Lambda = robot->taskInertiaMatrix(Jv);
+            J_bar = robot->dynConsistentInverseJacobian(Jv);
+            N = robot->nullspaceMatrix(Jv);
+
+            // operational space control
+            VectorXd F = Lambda * (-kp * (x - x_desired) - kv * dx);
+            VectorXd g = robot->jointGravityVector();
+
+            // // ----- (2d) -----
+            // control_torques = Jv.transpose() * F + N.transpose() * tao_damp + g;
+            
+            // // ----- (2e) (2f) -----
+            // control_torques = Jv.transpose() * F + N.transpose() * tao_mid + N.transpose() * tao_damp + g;
+
+            // // ----- (2g) -----
+            control_torques = Jv.transpose() * F + tao_mid + N.transpose() * tao_damp + g;
+
         }
 
         // ---------------------------  question 3 ---------------------------------------

@@ -181,7 +181,6 @@ int main(int argc, char** argv) {
         // ---------------------------  question 1 ---------------------------------------
         if(controller_number == 1) {
 
-
             // operational space control
             VectorXd x = robot->position(link_name, pos_in_link);
             VectorXd x_desired = x;

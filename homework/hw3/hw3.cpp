@@ -287,6 +287,58 @@ int main(int argc, char** argv) {
         else if(controller_number == 3) {
 
             control_torques.setZero();
+
+
+            // double kp = 100.0;
+            // double kv = 20.0;
+            // double kpj = 50.0;
+            // double kvj = 14.0;
+
+            // VectorXd F = Lambda * (-kp * (x - x_desired) - kv * dx);
+            // VectorXd g = robot->jointGravityVector();
+
+            // control_torques = robot->J_0().transpose() * F - N.transpose() * kvj * robot_dq + g;
+
+
+            double kp = 70.0;      
+            double kv = 35.0;            
+            double kvj = 14;   
+
+            Vector3d phi = Vector3d::Zero(3);
+            Matrix3d R_d;
+            R_d << cos(M_PI /3), 0, sin(M_PI / 3),
+                   0, 1, 0,
+                   -sin(M_PI / 3), 0, cos(M_PI / 3);
+            Matrix3d R = robot->rotation(link_name);
+
+            for (int i=0; i<3; i++){
+                Vector3d Ri = R(all, i);
+                Vector3d Rdi = R_d(all, i);
+                Vector3d crossp = Ri.cross(Rdi);
+                phi += crossp;
+            }
+            phi = -0.5 * phi;
+
+             
+            MatrixXd J_0 = robot->J(link_name, pos_in_link);
+            MatrixXd Lambda_0 = MatrixXd::Zero(6,6);
+            Lambda_0 = robot->taskInertiaMatrix(J_0);
+
+            Vector3d x_d = Vector3d(0.6, 0.3, 0.5);
+            Vector3d ee_pos = robot->position(link_name, pos_in_link);
+            Vector3d F_v = kp * (x_d - ee_pos) - kv * robot->linearVelocity(link_name, pos_in_link);
+            Vector3d F_w = kp * (-phi) - kv * robot->angularVelocity(link_name);
+            Vector6d F_vw;
+            F_vw << F_v, F_w;
+
+            VectorXd F = Lambda_0 * F_vw;
+
+            N = robot->nullspaceMatrix(J_0);
+            control_torques = J_0.transpose() * F - N.transpose() * kvj * robot->dq() + robot->jointGravityVector();
+
+            // ----- Save into the file -----
+            file_output << time << "\t" << ee_pos.transpose() << "\t" << x_d.transpose() << "\t" << robot->q().transpose() << "\n";
+
         }
 
         // ---------------------------  question 4 ---------------------------------------

@@ -19,10 +19,12 @@ def read_data(file_path='./data_files/que_1.txt', question_idx="1_a"):
 
     if "1" in question_idx:
         Y_dim = 3 * 2  # 3 for task space actual trajectory, 3 for task space desired trajectory
-    elif "2" in question_idx or "3" in question_idx:
+    elif "2" in question_idx:
         Y_dim = 3 * 2 + 2   # task space (xyz) + joint4, joint6
+    elif "4" in question_idx:
+        Y_dim = 3 * 2 + 4   # task space (xyz) + velocity (x, y, z, norm)
     else:
-        Y_dim = 0
+        raise ValueError("Invalid question_idx")
 
     Y_values_list = [ [] for i in range(Y_dim)]
     subTitle_values = [ " " for i in range(Y_dim)]
@@ -32,8 +34,12 @@ def read_data(file_path='./data_files/que_1.txt', question_idx="1_a"):
         title_values = f"Operational Space PD Controllers \n[Blue] Actual Trajectory vs [Red] Desired Trajectory"
     elif "2" in question_idx:
         title_values = "Null Space Control"
-    elif "3" in question_idx:
-        title_values = "Orientation Control with Full Jacobian"
+    elif "4" in question_idx:
+        if "b" in question_idx:
+            yes_or_no = "WITH 0.1m/s"
+        else:
+            yes_or_no = "WITHOUT"
+        title_values = f"Control {yes_or_no} Velocity Saturation"
     else:
         raise ValueError("Invalid question_idx")
     
@@ -50,17 +56,8 @@ def read_data(file_path='./data_files/que_1.txt', question_idx="1_a"):
                 # In task space -- actual trajectory (0-2) + expected trajectory (3-5)
                 Y_values_list[idx].append(float(line_content[idx+1]))
             else:
-                if "2" in question_idx or "3" in question_idx:
-                    # Find joint 4 and joint 6
-                    if idx == 6:
-                        Y_values_list[idx].append(float(line_content[-4]) * 180 / np.pi)  # joint 4 in [degree]
-                    elif idx == 7:
-                        Y_values_list[idx].append(float(line_content[-2]) * 180 / np.pi)  # joint 6 in [degree]
-                    else:
-                        continue
-                else:
-                    continue
-
+                # Y_values_list[idx].append(float(line_content[idx+1]) * 180 / np.pi)
+                Y_values_list[idx].append(float(line_content[idx+1]) * 1)
 
         i += group_size
 
@@ -76,19 +73,24 @@ def plot_data(q_values, Y_values_list, subTitle_values, title_values, output_fil
         # Y_dim = len(Y_values_list) / 2
         Y_dim = 3
         axis = ['x', 'y', 'z']
-    else:
+    elif "2" in question_idx:
         Y_dim = 5
         axis = ['x', 'y', 'z', 'Joint 4', 'Joint 6']
         joint_limits_high = [-30, 210]
         joint_limits_low = [-170, 0]
+    elif "4" in question_idx:
+        Y_dim = 4
+        # Y_dim = 6
+        axis = ['x', 'y', 'z', 'vel_x', 'vel_y', 'vel_z', 'vel_norm']
+    else:
+        raise ValueError("Invalid question_idx")
 
 
     fig, axs = plt.subplots(Y_dim, 1, figsize=(10 , 8 * Y_dim /3))  # Create a figure with 3 subplots
-    for i in range(Y_dim):
+    for i in range(3):
         # Plot actual trajectory in blue
         # Plot desired trajectory in red
         Y_unit = 'm' if i < 3 else 'radians'
-
         if i < 3: 
             axs[i].plot(q_values, Y_values_list[i], marker='o', linestyle='-', color='blue', label=f'Real Traj {axis[i]}')
             axs[i].plot(q_values, Y_values_list[i + 3], marker='*', linestyle='-', color='red', label=f'Desired Traj {axis[i]}')
@@ -96,27 +98,28 @@ def plot_data(q_values, Y_values_list, subTitle_values, title_values, output_fil
             axs[i].set_title(f'{Y_label} vs {X_label}')
             axs[i].set_xlabel(f'{X_label} ({X_unit})')
             axs[i].set_ylabel(f'{Y_label} ({Y_unit})')
+
+            axs[i].legend(loc='upper right')
+
+    boundary_high = [0.1 for q in q_values]
+    boundary_low = [-0.1 for q in q_values]
+    
+    axs[-1].plot(q_values, boundary_high, marker='.', linestyle='--', color='c', label=f'vel_limit')
+    axs[-1].plot(q_values, boundary_low, marker='.', linestyle='--', color='c')
+
+
+    axs[-1].plot(q_values, Y_values_list[6], marker='*', linestyle='-', color='r', label=f'vel_x')
+    axs[-1].plot(q_values, Y_values_list[7], marker='*', linestyle='-', color='g', label=f'vel_y')
+    axs[-1].plot(q_values, Y_values_list[8], marker='*', linestyle='-', color='b', label=f'vel_z')
+    axs[-1].plot(q_values, Y_values_list[9], marker='*', linestyle='-', color='k', label=f'vel_norm')
+
+
+
+    axs[-1].set_title(f'EEF linear velocity vs time')
+    axs[-1].set_xlabel(f'time (s)')
+    axs[-1].set_ylabel(f'linear velocity (m/s)')
+    axs[-1].legend(loc='upper right')
             
-
-            # plt.legend(loc='upper right')  # You can specify the location of the legend
-
-        elif 3 <= i and i < 5:
-            axs[i].plot(q_values, Y_values_list[i + 3], marker='o', linestyle='-', color='blue', label=f'joint Traj')
-
-            boundary_high = [joint_limits_high[i-3] for q in q_values]
-            boundary_low = [joint_limits_low[i-3] for q in q_values]
-            axs[i].plot(q_values, boundary_high, marker='o', linestyle='-', color='grey', label=f'joint limits')
-            axs[i].plot(q_values, boundary_low, marker='o', linestyle='-', color='grey')
-            
-            Y_label = f'{axis[i]}'
-            axs[i].set_title(f'{Y_label} vs {X_label}')
-            axs[i].set_xlabel(f'{X_label} ({X_unit})')
-            axs[i].set_ylabel(f'{Y_label} ({Y_unit})')
-        else:
-            continue
-
-        axs[i].legend(loc='upper right')
-
 
     # plt.suptitle(f'Simulated {mode} vs {X_label} ({intersted_range})')  # Set figure title
     plt.suptitle(f'{title_values}')  # Set figure title
@@ -135,7 +138,7 @@ os.chdir('/Users/zi-angcao/03_ResearchRepo/SAI2/OpenSai/STF_CS225A_HW/homework/h
 # for question_idx in ["1_a", "1_c"]:
 # for question_idx in ["2"]:
 # for question_idx in ["2_d", "2_e", "2_f", "2_g"]:
-for question_idx in ["3"]:
+for question_idx in ["4_a", "4_b"]:
     file_path=f'./data_files/que_{question_idx}.txt'
     output_file_path=f'./img_out/que_{question_idx}.png'
     X_values, Y_values_list, subTitle_values, title_values = read_data(file_path, question_idx)
